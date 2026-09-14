@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/CityOutskirts.unity
+    guid: 28af5b4c88c45932ac30c8cf8794544f
+  - enabled: 1
     path: Assets/Scenes/DrivingTest.unity
     guid: 544e5f9b19881d640af9674601c35e44
   m_configObjects: {}
