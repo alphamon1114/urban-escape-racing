@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Scenes/World01_Metro.unity
+    guid: ec638208b92ec2248832a81bf4cde329
+  - enabled: 1
     path: Assets/Scenes/DrivingTest.unity
     guid: 544e5f9b19881d640af9674601c35e44
   m_configObjects: {}

@@ -12,8 +12,6 @@ namespace UrbanEscape
         public float steeringRate = 85f;
         public float countersteerRate = 190f;
         public float countersteerAssist = 2.8f;
-        public bool adaptiveSteering = true;
-        [Range(4f, 16f)] public float cornerSlipAngle = 12f;
         public float SpeedKph => body.linearVelocity.magnitude * 3.6f;
         public float SteeringAngle => steering;
         public float DriftAmount => driftBlend;
@@ -62,8 +60,7 @@ namespace UrbanEscape
             float forwardSpeed = Vector3.Dot(body.linearVelocity, transform.forward);
             bool reversingSteering = steering * steerInput < 0f;
             float rate = reversingSteering ? Mathf.Max(steeringRate, countersteerRate) : steeringRate;
-            float targetSteering = SteeringTarget(forwardSpeed);
-            steering = Mathf.MoveTowards(steering, targetSteering, rate * Time.fixedDeltaTime);
+            steering = Mathf.MoveTowards(steering, steerInput * 32f, rate * Time.fixedDeltaTime);
             handbrakeBlend = Mathf.MoveTowards(handbrakeBlend, handbrake ? 1f : 0f,
                 Time.fixedDeltaTime / (handbrake ? 0.12f : 0.45f));
             UpdateDrift(forwardSpeed);
@@ -100,23 +97,6 @@ namespace UrbanEscape
             ApplyHandbrakeSteering(forwardSpeed);
             // Aerodynamic drag; lateral velocity is never snapped to the car heading.
             body.AddForce(-body.linearVelocity * (18f + 0.38f * body.linearVelocity.magnitude));
-        }
-
-        float SteeringTarget(float forwardSpeed)
-        {
-            float raw = steerInput * 32f;
-            if (!adaptiveSteering || handbrake || forwardSpeed < 5f || Mathf.Abs(steerInput) < 0.01f) return raw;
-            if (!wheels[0].isGrounded || !wheels[1].isGrounded) return raw;
-            // Aim relative to the front axle's actual travel direction, rather than forcing
-            // full lock against the road. The chassis yaw contribution is included here.
-            Vector3 front = (wheels[0].transform.position + wheels[1].transform.position) * 0.5f;
-            Vector3 local = transform.InverseTransformDirection(body.GetPointVelocity(front));
-            float travelAngle = Mathf.Atan2(local.x, Mathf.Max(1f, local.z)) * Mathf.Rad2Deg;
-            float usefulAngle = Mathf.Clamp(travelAngle + steerInput * cornerSlipAngle, -32f, 32f);
-            // Preserve sign and quick countersteering; no steering without driver input.
-            usefulAngle = steerInput > 0f ? Mathf.Clamp(usefulAngle, 0f, 32f) : Mathf.Clamp(usefulAngle, -32f, 0f);
-            float blend = Mathf.InverseLerp(5f, 14f, forwardSpeed) * (1f - driftBlend);
-            return Mathf.Lerp(raw, usefulAngle, blend);
         }
 
         void UpdateDrift(float forwardSpeed)
