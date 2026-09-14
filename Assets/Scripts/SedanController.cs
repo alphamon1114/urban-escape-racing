@@ -12,6 +12,7 @@ namespace UrbanEscape
         public float steeringRate = 85f;
         public float countersteerRate = 190f;
         public float countersteerAssist = 2.8f;
+        const float RearGrip = 1.35f;
         public float SpeedKph => body.linearVelocity.magnitude * 3.6f;
         public float SteeringAngle => steering;
         Rigidbody body;
@@ -31,11 +32,11 @@ namespace UrbanEscape
             {
                 wheels[i].ConfigureVehicleSubsteps(5f, 12, 15);
                 var friction = wheels[i].sidewaysFriction;
-                // Rear tires break away earlier, but retain sliding grip for countersteering.
-                friction.extremumSlip = i < 2 ? 0.24f : 0.22f;
+                // Front tires reach their limit first; the rear stays planted until handbraking.
+                friction.extremumSlip = i < 2 ? 0.22f : 0.30f;
                 friction.extremumValue = 1f;
                 friction.asymptoteSlip = 0.65f;
-                friction.asymptoteValue = i < 2 ? 0.85f : 0.84f;
+                friction.asymptoteValue = i < 2 ? 0.78f : 0.95f;
                 wheels[i].sidewaysFriction = friction;
             }
         }
@@ -57,9 +58,18 @@ namespace UrbanEscape
                 resetRequested = false;
             }
             float forwardSpeed = Vector3.Dot(body.linearVelocity, transform.forward);
+            float speedBlend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(30f, 140f, SpeedKph));
+            float steeringLimit = Mathf.Lerp(32f, 7f, speedBlend);
+            // Restore lock only while correcting an actual slide, not on every direction change.
+            float lateralSpeed = Vector3.Dot(body.linearVelocity, transform.right);
+            float slipAngle = Mathf.Atan2(lateralSpeed, Mathf.Max(1f, Mathf.Abs(forwardSpeed))) * Mathf.Rad2Deg;
+            float yaw = Vector3.Dot(body.angularVelocity, transform.up);
+            bool correctingSlide = forwardSpeed > 5f && steerInput * slipAngle > 0f && steerInput * yaw < 0f;
+            if (correctingSlide)
+                steeringLimit = Mathf.Lerp(steeringLimit, 32f, Mathf.InverseLerp(3f, 18f, Mathf.Abs(slipAngle)));
             bool reversingSteering = steering * steerInput < 0f;
-            float rate = reversingSteering ? Mathf.Max(steeringRate, countersteerRate) : steeringRate;
-            steering = Mathf.MoveTowards(steering, steerInput * 32f, rate * Time.fixedDeltaTime);
+            float rate = reversingSteering ? Mathf.Max(steeringRate, countersteerRate) : steeringRate * Mathf.Lerp(1f, 0.35f, speedBlend);
+            steering = Mathf.MoveTowards(steering, steerInput * steeringLimit, rate * Time.fixedDeltaTime);
             handbrakeBlend = Mathf.MoveTowards(handbrakeBlend, handbrake ? 1f : 0f,
                 Time.fixedDeltaTime / (handbrake ? 0.12f : 0.45f));
             float motor = 0f;
@@ -81,8 +91,8 @@ namespace UrbanEscape
                 wheel.motorTorque = handbrake && i >= 2 ? 0f : motor;
                 wheel.brakeTorque = i >= 2 && handbrake ? 4200f : brake;
                 var friction = wheel.sidewaysFriction;
-                // Full steering authority at any speed; rear grip limits cornering instead.
-                friction.stiffness = i < 2 ? 1.25f : Mathf.Lerp(1.12f, 0.65f, handbrakeBlend);
+                // Preserve momentum through an over-fast turn; Space deliberately releases the rear.
+                friction.stiffness = i < 2 ? 1.05f : Mathf.Lerp(RearGrip, 0.65f, handbrakeBlend);
                 wheel.sidewaysFriction = friction;
             }
             ApplyCountersteerAssist(forwardSpeed);

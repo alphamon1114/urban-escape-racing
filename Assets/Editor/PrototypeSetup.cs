@@ -101,8 +101,10 @@ public static class PrototypeSetup
             InputValue("steerInput",1f); Step(1); float first=car.SteeringAngle;
             if(first<=0 || first>=5f) throw new Exception("Steering ramp failed.");
             Step(80); float low=car.SteeringAngle;
+            InputValue("steerInput",0f); car.ResetVehicle(); Physics.SyncTransforms(); Step(100);
+            InputValue("steerInput",1f);
             rb.linearVelocity=car.transform.forward*40f; Step(20); float high=car.SteeringAngle;
-            if(Mathf.Abs(high-low)>0.1f) throw new Exception("High speed steering authority was reduced.");
+            if(low<31f || high>=low*0.6f || high<6f) throw new Exception("Speed-sensitive steering failed.");
             float rearSlip=0f, frontSlip=0f;
             for(int frame=0; frame<30; frame++)
             {
@@ -113,7 +115,7 @@ public static class PrototypeSetup
                     else rearSlip=Mathf.Max(rearSlip,Mathf.Abs(hit.sidewaysSlip));
                 }
             }
-            if(rearSlip<0.18f) throw new Exception("Rear tires did not break traction in fast corner.");
+            if(frontSlip<=rearSlip) throw new Exception("Fast corner did not produce front-led slip.");
             Debug.Log($"CORNER_CHECK rearPeakSlip={rearSlip:F3} frontPeakSlip={frontSlip:F3}");
             InputValue("handbrake",true); Step(1);
             if(car.wheels[2].brakeTorque<4000 || car.wheels[2].motorTorque!=0) throw new Exception("Handbrake failed.");
@@ -143,9 +145,9 @@ public static class PrototypeSetup
             if(counterYaw>=handbrakeYaw) throw new Exception("Handbrake countersteering failed.");
             InputValue("handbrake",false); Step(1);
             float releaseGrip=car.wheels[2].sidewaysFriction.stiffness;
-            if(releaseGrip>=1.12f || car.wheels[2].brakeTorque!=0) throw new Exception("Handbrake release failed.");
+            if(releaseGrip>=1.35f || car.wheels[2].brakeTorque!=0) throw new Exception("Handbrake release failed.");
             Step(30);
-            if(Mathf.Abs(car.wheels[2].sidewaysFriction.stiffness-1.12f)>0.01f) throw new Exception("Rear grip recovery failed.");
+            if(Mathf.Abs(car.wheels[2].sidewaysFriction.stiffness-1.35f)>0.01f) throw new Exception("Rear grip recovery failed.");
             Debug.Log($"HANDBRAKE_CHECK yaw={handbrakeYaw:F3} counterYaw={counterYaw:F3} releaseGrip={releaseGrip:F3}; front drive and smooth recovery passed.");
             Debug.Log($"PHYSICS_CHECK_OK acceleration={speed:F1}km/h braking={slowed:F1}km/h reverse={reverse:F1}m/s steeringFirst={first:F2} low={low:F1} high={high:F1}; ground, handbrake, reset passed.");
         }
